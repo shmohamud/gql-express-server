@@ -3,8 +3,8 @@ const fetch = require("node-fetch");
 const { JsonRpc } = require("eosjs");
 
 //access "full" eos block-level data
-const rpc = new JsonRpc("http://api.eosnewyork.io", { fetch });
 
+const rpc = new JsonRpc("http://api.eosnewyork.io", { fetch });
 const {
   GraphQLObjectType,
   GraphQLString,
@@ -13,46 +13,7 @@ const {
   GraphQLList
 } = graphql;
 
-async function getChainInfo() {
-  const resp = await rpc.get_info();
-  return await resp;
-}
-
-async function getBlock(n) {
-  const resp = await rpc.get_block(n);
-  const actionsCount = await countActions(resp);
-  if (actionsCount) {
-    resp.actions_count = actionsCount;
-  }
-  return await resp;
-}
-
-const countActions = block => {
-  let count = 0;
-  block.transactions.forEach(t => {
-    if (hasActions(t)) {
-      t.trx.transaction.actions.forEach(ac => (count += 1));
-    }
-  });
-  return count;
-};
-
-const hasActions = t => {
-  if (t.trx.hasOwnProperty("transaction")) {
-    return true;
-  }
-  return false;
-};
-
-async function getTenBlocks(num) {
-  const blocks = [];
-  let n = num;
-  for(let i=0; i<10; i++){
-    await blocks.push(await getBlock(n-i));
-  }
- 
-  return await blocks;
-}
+//------------------------------NON-ROOT-TYPES---------------------------------------------------//
 
 const ChainType = new GraphQLObjectType({
   name: "Chain",
@@ -129,8 +90,60 @@ const ActionType = new GraphQLObjectType({
   })
 });
 
+//-----------------------------------HELPERS---------------------------------------------------//
+
+async function getChainInfo() {
+  const data = await rpc.get_info();
+  return data;
+}
+
+async function getBlocks(n, lim) {
+  const blocks = [];
+  for (let i = 0; i < lim; i++) {
+    blocks.push(await getBlock(n - i));
+  }
+  return blocks;
+}
+
+async function getBlock(n) {
+  const data = await rpc.get_block(n);
+  const actionsCount = await countActions(data);
+  if (actionsCount) {
+    defineProperty(data, "actions_count", actionsCount);
+  } else {
+    defineProperty(data, "actions_count", 0);
+  }
+  return data;
+}
+
+//Returns total number of actions in a block
+const countActions = block => {
+  let count = 0;
+  block.transactions.forEach(t => {
+    if (hasActions(t)) {
+      t.trx.transaction.actions.forEach(() => (count += 1));
+    }
+  });
+  return count;
+};
+
+//Checks if a smart contract "transaction" in a block exists (and therefore has actions)
+const hasActions = t => {
+  if (t.trx.hasOwnProperty("transaction")) {
+    return true;
+  }
+  return false;
+};
+
+const defineProperty = (obj, k, v) => {
+  obj[k] = v;
+  return obj;
+};
+
+//-----------------------------------ROOT TYPES--------------------------------------------------------//
+
 const RootQuery = new GraphQLObjectType({
-  name: "RootQueryType",
+  name: "RootQuery",
   fields: {
     getChain: {
       type: ChainType,
@@ -142,16 +155,17 @@ const RootQuery = new GraphQLObjectType({
       type: BlockType,
       args: { block_num: { type: GraphQLInt } },
       resolve(parent, args) {
-        const block_num = args.block_num;
-        return getBlock(block_num);
+        const n = args.block_num;
+        return getBlock(n);
       }
     },
     getBlocks: {
       type: GraphQLList(BlockType),
-      args: { block_num: { type: GraphQLInt } },
+      args: { block_num: { type: GraphQLInt }, limit: { type: GraphQLInt } },
       resolve(parent, args) {
-        const block_num = args.block_num;
-        return getTenBlocks(block_num);
+        const n = args.block_num;
+        const lim = args.limit;
+        return getBlocks(n, lim);
       }
     }
   }
