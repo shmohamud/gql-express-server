@@ -13,22 +13,27 @@ const {
   GraphQLList
 } = graphql;
 
-//------------------------------NON-ROOT-TYPES---------------------------------------------------//
+//----------------------------------------------NON-ROOT-TYPES---------------------------------------------------//
 
 const ChainType = new GraphQLObjectType({
   name: "Chain",
   fields: () => ({
-    chain_id: { type: GraphQLString },
-    last_irreversible_block_num: { type: GraphQLInt },
-    last_irreversible_block_id: { type: GraphQLString },
-    head_block_id: { type: GraphQLString },
-    head_block_producer: { type: GraphQLString },
-    virtual_block_cpu_limit: { type: GraphQLInt },
-    virtual_block_net_limit: { type: GraphQLInt },
-    block_cpu_limit: { type: GraphQLInt },
+    server_version: { type: GraphQLString },
     server_version_string: { type: GraphQLString },
+    chain_id: { type: GraphQLString },
+    head_block_id: { type: GraphQLInt },
+    last_irreversible_block_id: { type: GraphQLString },
+    last_irreversible_block_num: { type: GraphQLInt },
+    head_block_id: { type: GraphQLString },
+    head_block_num: { type: GraphQLInt },
+    head_block_time: { type: GraphQLString },
+    head_block_producer: { type: GraphQLString },
     fork_db_head_block_num: { type: GraphQLInt },
-    fork_db_head_block_id: { type: GraphQLString }
+    fork_db_head_block_id: { type: GraphQLString },
+    block_cpu_limit: { type: GraphQLInt },
+    block_net_limit: { type: GraphQLInt },
+    virtual_block_cpu_limit: { type: GraphQLInt },
+    virtual_block_net_limit: { type: GraphQLInt }
   })
 });
 
@@ -36,15 +41,19 @@ const BlockType = new GraphQLObjectType({
   name: "Block",
   fields: () => ({
     id: { type: GraphQLString },
-    actions_count: { type: GraphQLInt },
     block_num: { type: GraphQLInt },
+    timestamp: { type: GraphQLString },
     producer: { type: GraphQLString },
     confirmed: { type: GraphQLInt },
     previous: { type: GraphQLString },
-    timestamp: { type: GraphQLString },
     transaction_mroot: { type: GraphQLString },
     action_mroot: { type: GraphQLString },
-    transactions: { type: GraphQLList(TransactionType) }
+    schedule_version: { type: GraphQLInt },
+    producer_signature: { type: GraphQLString },
+    actions_count: { type: GraphQLInt },
+    transactions: { type: GraphQLList(TransactionType) },
+    virtual_block_cpu_limit: { type: GraphQLInt },
+    virtual_block_net_limit: { type: GraphQLInt }
   })
 });
 
@@ -90,30 +99,43 @@ const ActionType = new GraphQLObjectType({
   })
 });
 
-//-----------------------------------HELPERS---------------------------------------------------//
+//----------------------------------------------------HELPERS---------------------------------------------------//
 
 async function getChainInfo() {
-  const data = await rpc.get_info();
-  return data;
+  try {
+    const data = await rpc.get_info();
+    return data;
+  } catch (err) {
+    console.log(err)
+  }
 }
 
 async function getBlocks(n, lim) {
   const blocks = [];
-  for (let i = 0; i < lim; i++) {
-    blocks.push(await getBlock(n - i));
+  try {
+    for (let i = 0; i < lim; i++) {
+      blocks.push(await getBlock(n - i));
+    }
+  } catch (err) {
+    console.log(err)
   }
+
   return blocks;
 }
 
 async function getBlock(n) {
   const data = await rpc.get_block(n);
-  const actionsCount = await countActions(data);
-  if (actionsCount) {
-    defineProperty(data, "actions_count", actionsCount);
-  } else {
-    defineProperty(data, "actions_count", 0);
+  try {
+    const actionsCount = await countActions(data);
+    if (actionsCount) {
+      defineProperty(data, "actions_count", actionsCount);
+    } else {
+      defineProperty(data, "actions_count", 0);
+    }
+    return data;
+  } catch (err) {
+    console.log(err)
   }
-  return data;
 }
 
 //Returns total number of actions in a block
@@ -127,7 +149,7 @@ const countActions = block => {
   return count;
 };
 
-//Checks if a smart contract "transaction" in a block exists (and therefore has actions)
+//Checks if a "transaction" in a block exists (and therefore has actions)
 const hasActions = t => {
   if (t.trx.hasOwnProperty("transaction")) {
     return true;
@@ -140,7 +162,13 @@ const defineProperty = (obj, k, v) => {
   return obj;
 };
 
-//-----------------------------------ROOT TYPES--------------------------------------------------------//
+async function getAbi(){
+  const data = await rpc.get_abi('eosio')
+}
+
+getAbi()
+
+//---------------------------------------------------ROOT TYPES--------------------------------------------------------//
 
 const RootQuery = new GraphQLObjectType({
   name: "RootQuery",
