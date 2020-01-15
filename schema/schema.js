@@ -47,7 +47,8 @@ const BlockType = new GraphQLObjectType({
     transactions: { type: GraphQLList(TransactionType) },
     virtual_block_cpu_limit: { type: GraphQLInt },
     virtual_block_net_limit: { type: GraphQLInt },
-    actions_count: { type: GraphQLInt }
+    actions_count: { type: GraphQLInt },
+    abi_array: {type: GraphQLList(AbiType)}
   })
 });
 const TransactionType = new GraphQLObjectType({
@@ -79,34 +80,69 @@ const TransactionReceiptType = new GraphQLObjectType({
     max_net_usage_words: { type: GraphQLInt },
     max_cpu_usage_sm: { type: GraphQLInt },
     delay_sec: { type: GraphQLInt },
-    actions: { type: GraphQLList(ActionType) }
+    actions: { type: GraphQLList(UserActionType) }
   })
 });
-const ActionType = new GraphQLObjectType({
+const UserActionType = new GraphQLObjectType({
   name: "Action",
   fields: () => ({
     account: { type: GraphQLString },
     name: { type: GraphQLString },
-    data: { type: GraphQLString }
+    data: { type: UserActionDataType },
   })
 });
-const ActionDataType = new GraphQLObjectType({
+const UserActionDataType = new GraphQLObjectType({
   name: "ActionData",
   fields: () => ({
-    chain_params_hash: { type: GraphQLString },
-    manifest_id: { type: GraphQLString }
+    from: { type: GraphQLString },
+    to: { type: GraphQLString }
   })
 });
-const BlockHeaderType = new GraphQLObjectType({
-  name: "BlockHeader",
+const AbiType = new GraphQLObjectType({
+  name: "AbiType",
   fields: () => ({
-    header: { type: HeaderType }
+    version: { type: GraphQLString },
+    types: { type: GraphQLList(GraphQLString) },
+    structs: { type: GraphQLList(StructType) },
+    actions: { type: GraphQLList(AbiActionType) },
+    tables: { type: GraphQLList(TableStructType) },
+    ricardian_clauses: { type: GraphQLList(GraphQLString) },
+    error_messages: { type: GraphQLList(GraphQLString) },
+    abi_extensions: { type: GraphQLList(GraphQLString) },
+    variants: { type: GraphQLList(GraphQLString) }
   })
 });
-const HeaderType = new GraphQLObjectType({
-  name: "Header",
+const AbiActionType = new GraphQLObjectType({
+  name: "AbiActionType",
   fields: () => ({
-    timestamp: { type: GraphQLString }
+    name: { type: GraphQLString },
+    type: { type: GraphQLString },
+    ricardian_contract: { type: GraphQLString }
+  })
+});
+const StructType = new GraphQLObjectType({
+  name: "StructType",
+  fields: () => ({
+    name: { type: GraphQLString },
+    base: { type: GraphQLString },
+    fields: { type: GraphQLList(StructFieldType) }
+  })
+});
+const StructFieldType = new GraphQLObjectType({
+  name: "StructFieldType",
+  fields: () => ({
+    name: { type: GraphQLString },
+    type: { type: GraphQLString }
+  })
+});
+const TableStructType = new GraphQLObjectType({
+  name: "TableStructType",
+  fields: () => ({
+    name: { type: GraphQLString },
+    index_type: { type: GraphQLString },
+    key_names: { type: GraphQLList(GraphQLString) },
+    key_types: { type: GraphQLList(GraphQLString) },
+    type: { type: GraphQLString }
   })
 });
 async function getChainMetadata() {
@@ -122,7 +158,6 @@ async function getBlockMetadata(num) {
   try {
     const actionsCount = await countActions(data);
     defineProperty(data, "actions_count", actionsCount);
-    delete data.transactions;
     return data;
   } catch (err) {
     console.log(err);
@@ -153,18 +188,25 @@ const countActions = block => {
   let count = 0;
   block.transactions.forEach(t => {
     if (hasActions(t)) {
-      t.trx.transaction.actions.forEach(() => (count += 1));
+      count+=t.trx.transaction.actions.length
     }
   });
   return count;
 };
-//If "transaction" property of trx exists, then a block has actions (all transaction have actions).
 const hasActions = t => {
   if (t.trx.hasOwnProperty("transaction")) {
     return true;
   }
   return false;
 };
+async function getAbi(account) {
+  try {
+    const data = await rpc.get_abi(account);
+    return data.abi;
+  } catch (err) {
+    console.log(err);
+  }
+}
 const defineProperty = (obj, k, v) => {
   obj[k] = v;
   return obj;
@@ -203,12 +245,12 @@ const RootQuery = new GraphQLObjectType({
         return getBlocks(num, limit);
       }
     },
-    getBlockHeader: {
-      type: BlockHeaderType,
-      args: { block_num: { type: GraphQLInt } },
+    getAbi: {
+      type: AbiType,
+      args: { account: { type: GraphQLString } },
       resolve(parent, args) {
-        const num = args.block_num;
-        return getBlockHeader(num);
+        const account = args.account;
+        return getAbi(account);
       }
     }
   }

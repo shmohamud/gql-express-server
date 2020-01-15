@@ -1,8 +1,8 @@
 const express = require("express");
+const cors = require("cors");
+const bodyParser = require("body-parser");
 const graphqlHTTP = require("express-graphql");
 const schema = require("./schema/schema");
-const bodyParser = require("body-parser");
-const cors = require("cors");
 
 const app = express();
 app.use(cors());
@@ -14,7 +14,6 @@ app.use(
     graphiql: true
   })
 );
-
 
 module.exports = app
 
