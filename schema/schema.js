@@ -48,7 +48,7 @@ const BlockType = new GraphQLObjectType({
     virtual_block_cpu_limit: { type: GraphQLInt },
     virtual_block_net_limit: { type: GraphQLInt },
     actions_count: { type: GraphQLInt },
-    abi_array: {type: GraphQLList(AbiType)}
+    abi_array: { type: GraphQLList(AbiType) }
   })
 });
 const TransactionType = new GraphQLObjectType({
@@ -88,7 +88,7 @@ const UserActionType = new GraphQLObjectType({
   fields: () => ({
     account: { type: GraphQLString },
     name: { type: GraphQLString },
-    data: { type: UserActionDataType },
+    data: { type: UserActionDataType }
   })
 });
 const UserActionDataType = new GraphQLObjectType({
@@ -153,16 +153,6 @@ async function getChainMetadata() {
     console.log(err);
   }
 }
-async function getBlockMetadata(num) {
-  const data = await rpc.get_block(num);
-  try {
-    const actionsCount = await countActions(data);
-    defineProperty(data, "actions_count", actionsCount);
-    return data;
-  } catch (err) {
-    console.log(err);
-  }
-}
 async function getBlock(num) {
   const data = await rpc.get_block(num);
   try {
@@ -188,7 +178,7 @@ const countActions = block => {
   let count = 0;
   block.transactions.forEach(t => {
     if (hasActions(t)) {
-      count+=t.trx.transaction.actions.length
+      count += t.trx.transaction.actions.length;
     }
   });
   return count;
@@ -199,6 +189,10 @@ const hasActions = t => {
   }
   return false;
 };
+const defineProperty = (obj, k, v) => {
+  obj[k] = v;
+  return obj;
+};
 async function getAbi(account) {
   try {
     const data = await rpc.get_abi(account);
@@ -207,10 +201,6 @@ async function getAbi(account) {
     console.log(err);
   }
 }
-const defineProperty = (obj, k, v) => {
-  obj[k] = v;
-  return obj;
-};
 const RootQuery = new GraphQLObjectType({
   name: "RootQuery",
   fields: {
@@ -218,14 +208,6 @@ const RootQuery = new GraphQLObjectType({
       type: ChainType,
       resolve() {
         return getChainMetadata();
-      }
-    },
-    getBlockMetadata: {
-      type: BlockType,
-      args: { block_num: { type: GraphQLInt } },
-      resolve(parent, args) {
-        const num = args.block_num;
-        return getBlockMetadata(num);
       }
     },
     getBlock: {
