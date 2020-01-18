@@ -156,8 +156,8 @@ async function getChainMetadata() {
 async function getBlock(num) {
   const data = await rpc.get_block(num);
   try {
-    const actionsCount = await countActions(data);
-    defineProperty(data, "actions_count", actionsCount);
+    const count = await countActions(data);
+    defineProperty(data, "actions_count", count);
     return data;
   } catch (err) {
     console.log(err);
@@ -175,13 +175,12 @@ async function getBlocks(num, limit) {
   return blocks;
 }
 const countActions = block => {
-  let count = 0;
   block.transactions.forEach(t => {
     if (hasActions(t)) {
-      count += t.trx.transaction.actions.length;
+      return t.trx.transaction.actions.length;
     }
   });
-  return count;
+  return 0;
 };
 const hasActions = t => {
   if (t.trx.hasOwnProperty("transaction")) {
