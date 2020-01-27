@@ -10,7 +10,6 @@ const {
   GraphQLSchema,
   GraphQLList
 } = graphql;
-
 const ChainType = new GraphQLObjectType({
   name: "Chain",
   fields: () => ({
