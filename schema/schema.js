@@ -2,7 +2,7 @@ const graphql = require("graphql");
 const fetch = require("node-fetch");
 const { JsonRpc } = require("eosjs");
 
-const rpc = new JsonRpc("https://api.eosdetroit.io", { fetch });
+const rpc = new JsonRpc("https://eos.greymass.com:443", { fetch });
 const {
   GraphQLObjectType,
   GraphQLString,
@@ -146,7 +146,6 @@ const TableStructType = new GraphQLObjectType({
 });
 async function getChainMetadata() {
   try {
-    console.log("RPC IN GET_INFO: ", rpc)
     const data = await rpc.get_info();
     return data;
   } catch (err) {
